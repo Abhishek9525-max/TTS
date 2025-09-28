@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Socket.IO TTS Demo</title>
+</head>
+
+<body>
+  <h1>Socket.IO TTS Demo</h1>
+
+  <button id="getVoices" type="button">Get Voices</button>
+  <br><br>
+  <textarea id="textInput" rows="4" cols="50" placeholder="Type text here..."></textarea>
+  <br>
+  <input id="voiceId" placeholder="Enter Voice ID">
+  <br>
+  <select id="language">
+    <option value="en">English</option>
+    <option value="hi">Hindi</option>
+  </select>
+  <br><br>
+  <button id="generateTTS" type="button">Generate TTS</button>
+
+  <p id="status"></p>
+  <audio id="audioPlayer" controls></audio>
+
+  <!-- Load Socket.IO Client -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    // Connect to your backend
+    const socket = io("http://localhost:3000"); // change if needed
+
+    const getVoicesBtn = document.getElementById("getVoices");
+    const generateTTSBtn = document.getElementById("generateTTS");
+    const textInput = document.getElementById("textInput");
+    const voiceIdInput = document.getElementById("voiceId");
+    const languageSelect = document.getElementById("language");
+    const status = document.getElementById("status");
+    const audioPlayer = document.getElementById("audioPlayer");
+
+    let audioChunks = [];
+
+    socket.on("connect", () => {
+      console.log("Connected:", socket.id);
+      status.textContent = "Connected to server.";
+    });
+
+    // Get Voices
+    getVoicesBtn.addEventListener("click", () => {
+      socket.emit("getVoices");
+    });
+
+    socket.on("voicesList", (voices) => {
+      console.log("Voices:", voices);
+      alert("Voices fetched. Check console for details.");
+    });
+
+    // Send TTS
+    generateTTSBtn.addEventListener("click", () => {
+      const text = textInput.value.trim();
+      const voiceId = voiceIdInput.value.trim();
+      const language = languageSelect.value;
+
+      if (!text || !voiceId) {
+        alert("Enter text and voice ID first!");
+        return;
+      }
+
+      audioChunks = [];
+      status.textContent = "Generating TTS...";
+      socket.emit("generateTTS", { text, voiceId, language });
+    });
+
+    // Handle audio chunks
+    socket.on("audioChunk", ({ chunk, seq }) => {
+      const audioBuffer = Uint8Array.from(atob(chunk), c => c.charCodeAt(0)).buffer;
+      audioChunks.push(audioBuffer);
+      console.log("Chunk", seq);
+    });
+
+    // When TTS complete
+    socket.on("ttsResult", (data) => {
+      status.textContent = "TTS complete. Playing audio...";
+      const fullBuffer = new Blob(audioChunks, { type: "audio/mpeg" });
+      const url = URL.createObjectURL(fullBuffer);
+      audioPlayer.src = url;
+      audioPlayer.play();
+      audioChunks = [];
+      console.log("Translated Text:", data.translatedText);
+    });
+
+    // Handle errors
+    socket.on("error", (err) => {
+      console.error("Socket error:", err);
+      status.textContent = "Error: " + err;
+    });
+  </script>
+</body>
+
+</html>
