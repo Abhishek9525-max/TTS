@@ -158,6 +158,7 @@ io.on("connection", (socket) => {
         message: "Audio saved locally",
         translatedText: text,
         path: filePath,
+        fileBase64: audioBuffer.toString("base64")
       });
     } catch (err) {
       console.error(err);

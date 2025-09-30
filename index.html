@@ -73,20 +73,26 @@
       socket.emit("generateTTS", { text, voiceId, language });
     });
 
-    // Handle audio chunks
+    // Handle audio chunks (✅ fixed here)
     socket.on("audioChunk", ({ chunk, seq }) => {
-      const audioBuffer = Uint8Array.from(atob(chunk), c => c.charCodeAt(0)).buffer;
-      audioChunks.push(audioBuffer);
+      const byteArray = Uint8Array.from(atob(chunk), c => c.charCodeAt(0));
+      audioChunks.push(byteArray);
       console.log("Chunk", seq);
     });
 
     // When TTS complete
     socket.on("ttsResult", (data) => {
       status.textContent = "TTS complete. Playing audio...";
-      const fullBuffer = new Blob(audioChunks, { type: "audio/mpeg" });
-      const url = URL.createObjectURL(fullBuffer);
+
+      // Merge Uint8Arrays into a Blob
+      const blob = new Blob(audioChunks, { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+
+      // Play in <audio>
       audioPlayer.src = url;
       audioPlayer.play();
+
+      // Reset
       audioChunks = [];
       console.log("Translated Text:", data.translatedText);
     });
