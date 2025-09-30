@@ -32,6 +32,12 @@ const __dirname = path.dirname(__filename);
 const AUDIO_DIR = path.join(__dirname, "audio_files");
 if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR);
 
+
+app.get('/',(req,res)=>{
+  res.status(200).json('Welcome to TTS Api')
+})
+
+
 // REST: list voices
 app.get("/voices", async (req, res) => {
   try {
