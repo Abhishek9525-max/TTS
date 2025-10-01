@@ -1,17 +1,19 @@
 // speechify-backend-server.js
-// Node.js backend with Express + Socket.io + ElevenLabs TTS streaming
-// Usage: set ELEVENLABS_API_KEY in .env and run `node --experimental-modules server.js` or use babel/ts-node
 
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
 import fs from "fs";
-import path from "path";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import path from "path";
+import { fileURLToPath } from "url";
+import { translate } from "@vitalets/google-translate-api"; // unofficial free translator
 
 dotenv.config();
 const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY;
+const PORT = process.env.PORT || 3000;
+
 if (!ELEVEN_KEY) {
   console.error("Set ELEVENLABS_API_KEY in .env");
   process.exit(1);
@@ -19,13 +21,22 @@ if (!ELEVEN_KEY) {
 
 const app = express();
 app.use(express.json());
-
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" },
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 const client = new ElevenLabsClient({ apiKey: ELEVEN_KEY });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure audio storage folder exists
+const AUDIO_DIR = path.join(__dirname, "audio_files");
+if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR);
+
+
+app.get('/',(req,res)=>{
+  res.status(200).json('Welcome to TTS Api')
+})
+
 
 // REST: list voices
 app.get("/voices", async (req, res) => {
@@ -38,50 +49,126 @@ app.get("/voices", async (req, res) => {
   }
 });
 
-// Simple health
-app.get("/health", (req, res) => res.json({ ok: true }));
+app.post("/tts", async (req, res) => {
+  try {
+    const {
+      text,
+      voiceId,
+      modelId = "eleven_multilingual_v2",
+      language = "en", // user selects language: en / fr / hi
+    } = req.body;
 
-// WebSocket real-time TTS
+    if (!text || !voiceId)
+      return res.status(400).json({ error: "text and voiceId required" });
+
+    let finalText = text;
+
+    // ✅ Only translate if Hindi requested
+    if (language === "hi") {
+      const translated = await translate(text, { to: "hi" });
+      finalText = translated.text;
+      console.log("Translated to Hindi:", finalText);
+    }
+
+    // Send final text to ElevenLabs
+    const stream = await client.textToSpeech.stream(voiceId, {
+      text: finalText,
+      modelId,
+    });
+
+    // Collect audio chunks   
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const audioBuffer = Buffer.concat(chunks);
+
+    // Save locally
+    const filePath = path.join(AUDIO_DIR, `audio_${Date.now()}.mp3`);
+    fs.writeFileSync(filePath, audioBuffer);
+
+    res.json({
+      message: "Audio saved locally",
+      translatedText: finalText,
+      path: filePath,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "TTS generation failed" });
+  }
+});
+
+// Existing Socket.IO streaming setup
 io.on("connection", (socket) => {
   console.log("client connected", socket.id);
 
-  socket.on("textChunk", async (msg) => {
-    // msg = { text: string, voiceId: string, modelId?: string }
+  // ✅ Get Voices over Socket
+  socket.on("getVoices", async () => {
     try {
-      const { text, voiceId, modelId = "eleven_multilingual_v2" } = msg;
+      const voices = await client.voices.getAll();
+      socket.emit("voicesList", voices);
+    } catch (err) {
+      console.error(err);
+      socket.emit("error", "Failed to fetch voices");
+    }
+  });
+
+  // ✅ Generate TTS over Socket
+ socket.on("generateTTS", async (msg) => {
+    try {
+      let {
+        text,
+        voiceId,
+        modelId = "eleven_multilingual_v2",
+        language = "en",
+      } = msg;
       if (!text || !voiceId)
         return socket.emit("error", "text and voiceId required");
-      if (text.length > 2000) return socket.emit("error", "chunk too long");
 
-      // Call ElevenLabs streaming API
+      // Translate if Hindi
+      if (language === "hi") {
+        const translated = await translate(text, { to: "hi" });
+        text = translated.text;
+        console.log("Translated to Hindi:", text);
+      }
+
+      // Stream audio chunks
       const stream = await client.textToSpeech.stream(voiceId, {
         text,
         modelId,
       });
 
-      // stream is async iterable of Uint8Array chunks
+      const chunks = [];
       let counter = 0;
       for await (const chunk of stream) {
-        // emit binary chunk to client
+        const buffer = Buffer.from(chunk);
+        chunks.push(buffer);
         socket.emit("audioChunk", {
-          chunk: Buffer.from(chunk).toString("base64"),
+          chunk: buffer.toString("base64"),
           seq: counter++,
         });
       }
 
-      // Optionally tell client this chunk finished
-      socket.emit("chunkComplete", { message: "done", seq: counter });
+      // Save full MP3
+      const audioBuffer = Buffer.concat(chunks);
+      const filePath = path.join(AUDIO_DIR, `audio_${Date.now()}.mp3`);
+      fs.writeFileSync(filePath, audioBuffer);
+
+      socket.emit("ttsResult", {
+        message: "Audio saved locally",
+        translatedText: text,
+        path: filePath,
+        fileBase64: audioBuffer.toString("base64")
+      });
     } catch (err) {
-      console.error("TTS error", err);
+      console.error(err);
       socket.emit("error", "TTS generation failed");
     }
   });
 
-  socket.on("disconnect", () => console.log("client disconnected", socket.id));
+  socket.on("disconnect", () =>
+    console.log("client disconnected", socket.id)
+  );
 });
 
-const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log("Server running on", PORT));
-
-// NOTE: Frontend should decode base64 audio chunks and append to buffer for playback.
-// Keep API key server-side; add rate-limiting & auth for production.
