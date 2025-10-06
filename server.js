@@ -32,11 +32,9 @@ const __dirname = path.dirname(__filename);
 const AUDIO_DIR = path.join(__dirname, "audio_files");
 if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR);
 
-
-app.get('/',(req,res)=>{
-  res.status(200).json('Welcome to TTS Api')
-})
-
+app.get("/", (req, res) => {
+  res.status(200).json("Welcome to TTS Api");
+});
 
 // REST: list voices
 app.get("/voices", async (req, res) => {
@@ -63,7 +61,7 @@ app.post("/tts", async (req, res) => {
 
     let finalText = text;
 
-    // ✅ Only translate if Hindi requested
+    // Only translate if Hindi requested
     if (language === "hi") {
       const translated = await translate(text, { to: "hi" });
       finalText = translated.text;
@@ -76,7 +74,7 @@ app.post("/tts", async (req, res) => {
       modelId,
     });
 
-    // Collect audio chunks   
+    // Collect audio chunks
     const chunks = [];
     for await (const chunk of stream) {
       chunks.push(Buffer.from(chunk));
@@ -102,7 +100,7 @@ app.post("/tts", async (req, res) => {
 io.on("connection", (socket) => {
   console.log("client connected", socket.id);
 
-  // ✅ Get Voices over Socket
+  // Get Voices over Socket
   socket.on("getVoices", async () => {
     try {
       const voices = await client.voices.getAll();
@@ -113,9 +111,10 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ✅ Generate TTS over Socket
- socket.on("generateTTS", async (msg) => {
+  // Generate TTS over Socket
+  socket.on("generateTTS", async (msg) => {
     try {
+      
       let {
         text,
         voiceId,
@@ -124,6 +123,7 @@ io.on("connection", (socket) => {
       } = msg;
       if (!text || !voiceId)
         return socket.emit("error", "text and voiceId required");
+      console.log(text, voiceId, language);
 
       // Translate if Hindi
       if (language === "hi") {
@@ -158,7 +158,7 @@ io.on("connection", (socket) => {
         message: "Audio saved locally",
         translatedText: text,
         path: filePath,
-        fileBase64: audioBuffer.toString("base64")
+        fileBase64: audioBuffer.toString("base64"),
       });
     } catch (err) {
       console.error(err);
@@ -166,9 +166,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("disconnect", () =>
-    console.log("client disconnected", socket.id)
-  );
+  socket.on("disconnect", () => console.log("client disconnected", socket.id));
 });
 
 server.listen(PORT, () => console.log("Server running on", PORT));

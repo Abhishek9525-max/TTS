@@ -31,8 +31,8 @@
   <script>
     // Connect to your backend
     // const socket = io("http://localhost:3000"); // change if needed
-    // const socket = io("https://tts-1-coe0.onrender.com"); // change if needed
-    const socket = io("https://tts-lake-ten.vercel.app/"); // change if needed
+    const socket = io("https://tts-1-coe0.onrender.com"); // change if needed
+    // const socket = io("https://tts-git-indextoserver-abhisheks-projects-7f16dbb3.vercel.app/"); // change if needed
 
     const getVoicesBtn = document.getElementById("getVoices");
     const generateTTSBtn = document.getElementById("generateTTS");
@@ -75,7 +75,7 @@
       socket.emit("generateTTS", { text, voiceId, language });
     });
 
-    // Handle audio chunks (✅ fixed here)
+    // Handle audio chunks ( fixed here)
     socket.on("audioChunk", ({ chunk, seq }) => {
       const byteArray = Uint8Array.from(atob(chunk), c => c.charCodeAt(0));
       audioChunks.push(byteArray);
