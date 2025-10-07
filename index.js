@@ -1,5 +1,3 @@
-// speechify-backend-server.js
-
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -111,14 +109,15 @@ io.on("connection", (socket) => {
     }
   });
 
+
   // Generate TTS over Socket
   socket.on("generateTTS", async (msg) => {
     try {
-      
       let {
         text,
         voiceId,
-        modelId = "eleven_multilingual_v2",
+        modelId = "eleven_flash_v2_5",
+        // modelId = "eleven_multilingual_v2",
         language = "en",
       } = msg;
       if (!text || !voiceId)
