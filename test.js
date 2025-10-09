@@ -13,8 +13,8 @@ const PORT = process.env.PORT || 3000;
 dotenv.config();
 const API_KEY = process.env.API_KEY;
 
-if (!ELEVEN_KEY) {
-  console.error("Set ELEVENLABS_API_KEY in .env");
+if (!API_KEY) {
+  console.error("Set API_KEY in .env");
   process.exit(1);
 }
 
