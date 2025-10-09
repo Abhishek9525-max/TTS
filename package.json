@@ -13,11 +13,11 @@
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.16.0",
     "@vitalets/google-translate-api": "^9.2.1",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "fs": "^0.0.1-security",
     "path": "^0.12.7",
     "socket.io": "^4.8.1"
-  },
-  "type": "module"
+  }
 }

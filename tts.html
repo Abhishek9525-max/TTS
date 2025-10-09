@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TTS Audio Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background-color: #f9fafb;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    input,
+    select,
+    button {
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+      font-size: 16px;
+    }
+
+    audio {
+      margin-top: 20px;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🎤 Text To Speech Demo</h1>
+
+  <label>Enter Text:</label>
+  <textarea id="textInput" rows="4" style="width:100%; padding:10px;"></textarea>
+
+  <label>Speaker ID:</label>
+  <input type="text" id="speakerInput" placeholder="Enter speaker ID" />
+
+  <button id="generateBtn">Generate Speech</button>
+
+  <audio id="audioPlayer" controls></audio>
+
+  <script>
+    document.getElementById("generateBtn").addEventListener("click", async () => {
+      const text = document.getElementById("textInput").value.trim();
+      const speaker = document.getElementById("speakerInput").value.trim();
+      const audioPlayer = document.getElementById("audioPlayer");
+
+      if (!text || !speaker) {
+        alert("Please enter both text and speaker ID.");
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:3000/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, speaker }),
+        });
+
+        if (!response.ok) {
+          throw new Error("TTS generation failed.");
+        }
+
+        // Get audio blob from response
+        const blob = await response.blob();
+        const audioUrl = URL.createObjectURL(blob);
+
+        // Set to audio player
+        audioPlayer.src = audioUrl;
+        audioPlayer.play();
+      } catch (error) {
+        console.error(error);
+        alert("Error generating speech. Check console for details.");
+      }
+    });
+  </script>
+</body>
+
+</html>
